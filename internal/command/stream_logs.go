@@ -2,17 +2,16 @@ package command
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"log"
 
-	"code.cloudfoundry.org/cli/cf/terminal"
 	loggregator "code.cloudfoundry.org/go-loggregator"
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	"github.com/cloudfoundry/log-stream-cli/internal/log_stream_plugin"
 	"github.com/gogo/protobuf/jsonpb"
 )
 
-func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, ui terminal.UI) {
+func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writer) {
 	c := loggregator.NewRLPGatewayClient(
 		logStreamUrl,
 		loggregator.WithRLPGatewayHTTPClient(doer),
@@ -23,11 +22,11 @@ func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, ui terminal.UI
 	marshaler := jsonpb.Marshaler{}
 	for {
 		for _, e := range es() {
-			if err := marshaler.Marshal(ui.Writer(), e); err != nil {
+			if err := marshaler.Marshal(writer, e); err != nil {
 				log.Fatal(err)
 			}
+			writer.Write([]byte("\n"))
 		}
-		fmt.Println("")
 	}
 }
 

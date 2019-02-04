@@ -1,17 +1,15 @@
 package command_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 
-	"code.cloudfoundry.org/cli/cf/terminal"
-	"code.cloudfoundry.org/cli/cf/trace/tracefakes"
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	"github.com/cloudfoundry/log-stream-cli/internal/command"
-	"github.com/cloudfoundry/log-stream-cli/internal/testhelpers"
 	"github.com/gogo/protobuf/jsonpb"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,26 +17,11 @@ import (
 
 var _ = Describe("StreamLogs", func() {
 	var (
-		ui terminal.UI
-
-		printer      *testhelpers.FakePrinter
-		tracePrinter *tracefakes.FakePrinter
-
-		stdin  *testhelpers.SyncedBuffer
-		stdout *testhelpers.SyncedBuffer
+		buf *bytes.Buffer
 	)
 
 	BeforeEach(func() {
-		stdin = &testhelpers.SyncedBuffer{}
-		stdout = &testhelpers.SyncedBuffer{}
-
-		printer = new(testhelpers.FakePrinter)
-		printer.PrintfStub = func(format string, a ...interface{}) (n int, err error) {
-			return fmt.Fprintf(stdout, format, a...)
-		}
-		tracePrinter = new(tracefakes.FakePrinter)
-
-		ui = terminal.NewUI(stdin, stdout, printer, tracePrinter)
+		buf = bytes.NewBuffer([]byte{})
 	})
 
 	It("connects to the specified gateway host with the correct query params", func() {
@@ -49,14 +32,14 @@ var _ = Describe("StreamLogs", func() {
 				StatusCode: 200,
 			},
 		}
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, ui)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, buf)
 
-		Eventually(func() string { return doer.ReqHost }).Should(Equal("log-stream.test-minster.cf-app.com"))
-		Eventually(func() url.Values { return doer.ReqQuery }).Should(HaveKeyWithValue("log", []string{""}))
-		Eventually(func() url.Values { return doer.ReqQuery }).Should(HaveKeyWithValue("counter", []string{""}))
-		Eventually(func() url.Values { return doer.ReqQuery }).Should(HaveKeyWithValue("gauge", []string{""}))
-		Eventually(func() url.Values { return doer.ReqQuery }).Should(HaveKeyWithValue("timer", []string{""}))
-		Eventually(func() url.Values { return doer.ReqQuery }).Should(HaveKeyWithValue("event", []string{""}))
+		Eventually(func() string { return doer.host }).Should(Equal("log-stream.test-minster.cf-app.com"))
+		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("log", []string{""}))
+		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("counter", []string{""}))
+		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("gauge", []string{""}))
+		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("timer", []string{""}))
+		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("event", []string{""}))
 	})
 
 	It("writes received envelopes to the terminal", func() {
@@ -67,14 +50,32 @@ var _ = Describe("StreamLogs", func() {
 				StatusCode: 200,
 			},
 		}
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, ui)
+
+		envelopeOne := &loggregator_v2.Envelope{
+			Message: &loggregator_v2.Envelope_Log{
+				Log: &loggregator_v2.Log{
+					Payload: []byte("hello, world"),
+				},
+			},
+		}
+
+		envelopeTwo := &loggregator_v2.Envelope{
+			Message: &loggregator_v2.Envelope_Log{
+				Log: &loggregator_v2.Log{
+					Payload: []byte("goodbye, world"),
+				},
+			},
+		}
+
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, buf)
 
 		go func() {
 			m := jsonpb.Marshaler{}
-			for i := 0; i < 10; i++ {
+			for i := 0; i < 1; i++ {
 				s, err := m.MarshalToString(&loggregator_v2.EnvelopeBatch{
 					Batch: []*loggregator_v2.Envelope{
-						{Timestamp: int64(i)},
+						envelopeOne,
+						envelopeTwo,
 					},
 				})
 				if err != nil {
@@ -84,20 +85,21 @@ var _ = Describe("StreamLogs", func() {
 			}
 		}()
 
-		Eventually(stdout).Should(ContainSubstring("timestamp"))
+		Eventually(func() string { return buf.String() }).Should(Equal(
+			"{\"log\":{\"payload\":\"aGVsbG8sIHdvcmxk\"}}\n{\"log\":{\"payload\":\"Z29vZGJ5ZSwgd29ybGQ=\"}}\n"))
 	})
 })
 
 type fakeDoer struct {
 	response *http.Response
-	ReqHost  string
-	ReqQuery url.Values
+	host     string
+	query    url.Values
 	err      error
 }
 
 func (d *fakeDoer) Do(req *http.Request) (*http.Response, error) {
-	d.ReqHost = req.URL.Host
-	d.ReqQuery = req.URL.Query()
+	d.host = req.URL.Host
+	d.query = req.URL.Query()
 
 	if d.err != nil {
 		return nil, d.err
