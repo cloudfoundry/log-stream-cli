@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log"
 
@@ -23,8 +24,21 @@ func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writ
 	marshaler := jsonpb.Marshaler{}
 	for {
 		for _, e := range es() {
-			if err := marshaler.Marshal(writer, e); err != nil {
-				log.Fatal(err)
+			switch e.Message.(type) {
+			case *loggregator_v2.Envelope_Log:
+				bytes, err := json.Marshal(log_stream_plugin.BuildBase64DecodedLog(e))
+				if err != nil {
+					log.Fatal("error marshalling", err)
+				}
+
+				_, err = writer.Write(bytes)
+				if err != nil {
+					log.Fatal(err)
+				}
+			default:
+				if err := marshaler.Marshal(writer, e); err != nil {
+					log.Fatal(err)
+				}
 			}
 			writer.Write([]byte("\n"))
 		}

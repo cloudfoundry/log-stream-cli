@@ -87,7 +87,7 @@ var _ = Describe("StreamLogs", func() {
 		}()
 
 		Eventually(func() string { return buf.String() }).Should(Equal(
-			"{\"log\":{\"payload\":\"aGVsbG8sIHdvcmxk\"}}\n{\"log\":{\"payload\":\"Z29vZGJ5ZSwgd29ybGQ=\"}}\n"))
+			"{\"log\":{\"payload\":\"hello, world\"}}\n{\"log\":{\"payload\":\"goodbye, world\"}}\n"))
 	})
 
 	Context("when there is an error", func() {
