@@ -14,6 +14,7 @@ import (
 func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writer) {
 	c := loggregator.NewRLPGatewayClient(
 		logStreamUrl,
+		loggregator.WithRLPGatewayClientLogger(log.New(log_stream_plugin.NewDedupeWriter(writer), "", 0)),
 		loggregator.WithRLPGatewayHTTPClient(doer),
 	)
 

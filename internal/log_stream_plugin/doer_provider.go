@@ -10,7 +10,7 @@ type Doer interface {
 }
 
 type AuthDoer struct {
-	token string
+	token  string
 	Client Doer
 }
 
@@ -29,7 +29,7 @@ func NewDoer(accessToken string, insecureSkipVerify bool) Doer {
 	}
 
 	return &AuthDoer{
-		token: accessToken,
+		token:  accessToken,
 		Client: client,
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	"github.com/cloudfoundry/log-stream-cli/internal/command"
@@ -87,6 +88,21 @@ var _ = Describe("StreamLogs", func() {
 
 		Eventually(func() string { return buf.String() }).Should(Equal(
 			"{\"log\":{\"payload\":\"aGVsbG8sIHdvcmxk\"}}\n{\"log\":{\"payload\":\"Z29vZGJ5ZSwgd29ybGQ=\"}}\n"))
+	})
+
+	Context("when there is an error", func() {
+		It("writes the error", func() {
+			doer := &fakeDoer{
+				response: &http.Response{
+					Body:       ioutil.NopCloser(strings.NewReader(`{"message": "there was an error"}`)),
+					StatusCode: 404,
+				},
+			}
+
+			go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, buf)
+
+			Eventually(func() string { return buf.String() }).Should(ContainSubstring(`{"message": "there was an error"}`))
+		})
 	})
 })
 
