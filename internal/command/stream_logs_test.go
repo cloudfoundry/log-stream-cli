@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	"github.com/cloudfoundry/log-stream-cli/internal/command"
@@ -18,11 +19,13 @@ import (
 
 var _ = Describe("StreamLogs", func() {
 	var (
-		buf *bytes.Buffer
+		writer *syncedWriter
 	)
 
 	BeforeEach(func() {
-		buf = bytes.NewBuffer([]byte{})
+		writer = &syncedWriter{
+			buf: bytes.NewBuffer([]byte{}),
+		}
 	})
 
 	It("connects to the specified gateway host with the correct query params", func() {
@@ -33,14 +36,14 @@ var _ = Describe("StreamLogs", func() {
 				StatusCode: 200,
 			},
 		}
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, buf)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
 
-		Eventually(func() string { return doer.host }).Should(Equal("log-stream.test-minster.cf-app.com"))
-		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("log", []string{""}))
-		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("counter", []string{""}))
-		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("gauge", []string{""}))
-		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("timer", []string{""}))
-		Eventually(func() url.Values { return doer.query }).Should(HaveKeyWithValue("event", []string{""}))
+		Eventually(doer.Host).Should(Equal("log-stream.test-minster.cf-app.com"))
+		Eventually(doer.Query).Should(HaveKeyWithValue("log", []string{""}))
+		Eventually(doer.Query).Should(HaveKeyWithValue("counter", []string{""}))
+		Eventually(doer.Query).Should(HaveKeyWithValue("gauge", []string{""}))
+		Eventually(doer.Query).Should(HaveKeyWithValue("timer", []string{""}))
+		Eventually(doer.Query).Should(HaveKeyWithValue("event", []string{""}))
 	})
 
 	It("writes received envelopes to the terminal", func() {
@@ -68,7 +71,7 @@ var _ = Describe("StreamLogs", func() {
 			},
 		}
 
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, buf)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
 
 		go func() {
 			m := jsonpb.Marshaler{}
@@ -86,7 +89,7 @@ var _ = Describe("StreamLogs", func() {
 			}
 		}()
 
-		Eventually(func() string { return buf.String() }).Should(Equal(
+		Eventually(writer.String).Should(Equal(
 			"{\"log\":{\"payload\":\"hello, world\"}}\n{\"log\":{\"payload\":\"goodbye, world\"}}\n"))
 	})
 
@@ -99,9 +102,9 @@ var _ = Describe("StreamLogs", func() {
 				},
 			}
 
-			go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, buf)
+			go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
 
-			Eventually(func() string { return buf.String() }).Should(ContainSubstring(`{"message": "there was an error"}`))
+			Eventually(writer.String).Should(ContainSubstring(`{"message": "there was an error"}`))
 		})
 	})
 })
@@ -111,9 +114,28 @@ type fakeDoer struct {
 	host     string
 	query    url.Values
 	err      error
+
+	mu sync.Mutex
+}
+
+func (d *fakeDoer) Query() url.Values {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.query
+}
+
+func (d *fakeDoer) Host() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.host
 }
 
 func (d *fakeDoer) Do(req *http.Request) (*http.Response, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	d.host = req.URL.Host
 	d.query = req.URL.Query()
 
@@ -133,4 +155,24 @@ func (r channelReader) Read(buf []byte) (int, error) {
 	}
 	n := copy(buf, data)
 	return n, nil
+}
+
+type syncedWriter struct {
+	buf *bytes.Buffer
+
+	mu sync.Mutex
+}
+
+func (w *syncedWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.buf.Write(p)
+}
+
+func (w *syncedWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.buf.String()
 }
