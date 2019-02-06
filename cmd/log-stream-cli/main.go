@@ -12,13 +12,7 @@ import (
 
 type CFLogStreamCLI struct{}
 
-const UNINSTALL_FLAG = "CLI-MESSAGE-UNINSTALL"
-
 func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
-	if args[0] == UNINSTALL_FLAG {
-		return
-	}
-
 	accessToken, err := conn.AccessToken()
 	if err != nil {
 		log.Fatal("unable to retrieve access token", err)
@@ -34,7 +28,10 @@ func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
 		log.Fatal("invalid log stream endpoint", err)
 	}
 
-	command.StreamLogs(logStreamEndpoint, log_stream_plugin.NewDoer(accessToken, skipSSL), os.Stdout)
+	switch args[0] {
+	case "log-stream":
+		command.StreamLogs(args[1:], logStreamEndpoint, log_stream_plugin.NewDoer(accessToken, skipSSL), os.Stdout)
+	}
 
 	return
 }

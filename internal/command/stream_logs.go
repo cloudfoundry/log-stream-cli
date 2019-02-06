@@ -12,14 +12,14 @@ import (
 	"github.com/gogo/protobuf/jsonpb"
 )
 
-func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writer) {
+func StreamLogs(sourceIDs []string, logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writer) {
 	c := loggregator.NewRLPGatewayClient(
 		logStreamUrl,
 		loggregator.WithRLPGatewayClientLogger(log.New(log_stream_plugin.NewDedupeWriter(writer), "", 0)),
 		loggregator.WithRLPGatewayHTTPClient(doer),
 	)
 
-	es := c.Stream(context.Background(), selectors)
+	es := c.Stream(context.Background(), req(sourceIDs))
 
 	marshaler := jsonpb.Marshaler{}
 	for {
@@ -45,32 +45,52 @@ func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writ
 	}
 }
 
-var selectors = &loggregator_v2.EgressBatchRequest{
-	Selectors: []*loggregator_v2.Selector{
+func req(sourceIDs []string) *loggregator_v2.EgressBatchRequest {
+	var s []*loggregator_v2.Selector
+	for _, sourceId := range sourceIDs {
+		s = append(s, selectors(sourceId)...)
+	}
+
+	if len(s) == 0 {
+		s = selectors("")
+	}
+
+	return &loggregator_v2.EgressBatchRequest{
+		Selectors: s,
+	}
+}
+
+func selectors(sourceId string) []*loggregator_v2.Selector {
+	return []*loggregator_v2.Selector{
 		{
+			SourceId: sourceId,
 			Message: &loggregator_v2.Selector_Log{
 				Log: &loggregator_v2.LogSelector{},
 			},
 		},
 		{
+			SourceId: sourceId,
 			Message: &loggregator_v2.Selector_Counter{
 				Counter: &loggregator_v2.CounterSelector{},
 			},
 		},
 		{
+			SourceId: sourceId,
 			Message: &loggregator_v2.Selector_Event{
 				Event: &loggregator_v2.EventSelector{},
 			},
 		},
 		{
+			SourceId: sourceId,
 			Message: &loggregator_v2.Selector_Gauge{
 				Gauge: &loggregator_v2.GaugeSelector{},
 			},
 		},
 		{
+			SourceId: sourceId,
 			Message: &loggregator_v2.Selector_Timer{
 				Timer: &loggregator_v2.TimerSelector{},
 			},
 		},
-	},
+	}
 }
