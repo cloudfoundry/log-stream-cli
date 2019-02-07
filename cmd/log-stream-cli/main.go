@@ -15,7 +15,7 @@ import (
 type CFLogStreamCLI struct{}
 
 type CLIFlags struct {
-	MetricTypes []string `short:"t",long:"type"`
+	MetricTypes []string `short:"t" long:"type"`
 }
 
 func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
