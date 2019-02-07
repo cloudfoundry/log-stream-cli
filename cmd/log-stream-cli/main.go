@@ -8,9 +8,15 @@ import (
 	"code.cloudfoundry.org/cli/plugin"
 	"github.com/cloudfoundry/log-stream-cli/internal/command"
 	"github.com/cloudfoundry/log-stream-cli/internal/log_stream_plugin"
+
+	flags "github.com/jessevdk/go-flags"
 )
 
 type CFLogStreamCLI struct{}
+
+type CLIFlags struct {
+	MetricTypes []string `short:"t",long:"type"`
+}
 
 func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
 	accessToken, err := conn.AccessToken()
@@ -28,9 +34,25 @@ func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
 		log.Fatal("invalid log stream endpoint", err)
 	}
 
+	var cliFlags CLIFlags
+	parser := flags.NewParser(&cliFlags, flags.Default)
+	if _, err := parser.Parse(); err != nil {
+		log.Fatal("error parsing flags", err)
+	}
+
+	if args, err = parser.ParseArgs(args); err != nil {
+		log.Fatal("error parsing args", err)
+	}
+
 	switch args[0] {
 	case "log-stream":
-		command.StreamLogs(args[1:], logStreamEndpoint, log_stream_plugin.NewDoer(accessToken, skipSSL), os.Stdout)
+		command.StreamLogs(
+			logStreamEndpoint,
+			log_stream_plugin.NewDoer(accessToken, skipSSL),
+			os.Stdout,
+			command.WithSourceIDs(args[1:]),
+			command.WithMetricTypes(cliFlags.MetricTypes),
+		)
 	}
 
 	return
@@ -51,7 +73,10 @@ func (c CFLogStreamCLI) GetMetadata() plugin.PluginMetadata {
 				Name:     "log-stream",
 				HelpText: "Stream all messages of all types from Loggregator",
 				UsageDetails: plugin.Usage{
-					Usage: "log-stream",
+					Usage: "log-stream <source-id> [<source-id>] [options]",
+					Options: map[string]string{
+						"-type, -t": "Filter the streamed logs. Available: 'log','event','counter','gauge','timer'. Allows multiple.",
+					},
 				},
 			},
 		},

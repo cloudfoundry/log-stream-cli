@@ -36,7 +36,7 @@ var _ = Describe("StreamLogs", func() {
 				StatusCode: 200,
 			},
 		}
-		go command.StreamLogs([]string{}, "https://log-stream.test-minster.cf-app.com", doer, writer)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
 
 		Eventually(doer.Host).Should(Equal("log-stream.test-minster.cf-app.com"))
 		Eventually(doer.Query).Should(HaveKeyWithValue("log", []string{""}))
@@ -46,7 +46,7 @@ var _ = Describe("StreamLogs", func() {
 		Eventually(doer.Query).Should(HaveKeyWithValue("event", []string{""}))
 	})
 
-	It("passes source_id when present", func() {
+	It("filters by source id", func() {
 		ch := make(chan []byte, 100)
 		doer := &fakeDoer{
 			response: &http.Response{
@@ -54,9 +54,27 @@ var _ = Describe("StreamLogs", func() {
 				StatusCode: 200,
 			},
 		}
-		go command.StreamLogs([]string{"some-source-id", "another-source-id"}, "https://log-stream.test-minster.cf-app.com", doer, writer)
+
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer, command.WithSourceIDs([]string{"some-source-id", "another-source-id"}))
 
 		Eventually(doer.Query).Should(HaveKeyWithValue("source_id", []string{"some-source-id", "another-source-id"}))
+	})
+
+	It("filters by metric type", func() {
+		ch := make(chan []byte, 100)
+		doer := &fakeDoer{
+			response: &http.Response{
+				Body:       ioutil.NopCloser(channelReader(ch)),
+				StatusCode: 200,
+			},
+		}
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer, command.WithMetricTypes([]string{"gauge", "timer"}))
+
+		Eventually(doer.Query).Should(HaveKeyWithValue("gauge", []string{""}))
+		Eventually(doer.Query).Should(HaveKeyWithValue("timer", []string{""}))
+		Consistently(doer.Query).ShouldNot(HaveKeyWithValue("event", []string{""}))
+		Consistently(doer.Query).ShouldNot(HaveKeyWithValue("log", []string{""}))
+		Consistently(doer.Query).ShouldNot(HaveKeyWithValue("counter", []string{""}))
 	})
 
 	It("writes received envelopes to the terminal", func() {
@@ -84,7 +102,7 @@ var _ = Describe("StreamLogs", func() {
 			},
 		}
 
-		go command.StreamLogs([]string{}, "https://log-stream.test-minster.cf-app.com", doer, writer)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
 
 		go func() {
 			m := jsonpb.Marshaler{}
@@ -115,7 +133,7 @@ var _ = Describe("StreamLogs", func() {
 				},
 			}
 
-			go command.StreamLogs([]string{}, "https://log-stream.test-minster.cf-app.com", doer, writer)
+			go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
 
 			Eventually(writer.String).Should(ContainSubstring(`{"message": "there was an error"}`))
 		})

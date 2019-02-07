@@ -12,14 +12,23 @@ import (
 	"github.com/gogo/protobuf/jsonpb"
 )
 
-func StreamLogs(sourceIDs []string, logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writer) {
+func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writer, options ...applyOptionFn) {
 	c := loggregator.NewRLPGatewayClient(
 		logStreamUrl,
 		loggregator.WithRLPGatewayClientLogger(log.New(log_stream_plugin.NewDedupeWriter(writer), "", 0)),
 		loggregator.WithRLPGatewayHTTPClient(doer),
 	)
 
-	es := c.Stream(context.Background(), req(sourceIDs))
+	opts := &streamLogsOptions{}
+	for _, apply := range options {
+		apply(opts)
+	}
+
+	r, err := log_stream_plugin.MakeRequest(opts.sourceIDs, opts.metricTypes)
+	if err != nil {
+		log.Fatal(err)
+	}
+	es := c.Stream(context.Background(), r)
 
 	marshaler := jsonpb.Marshaler{}
 	for {
@@ -45,52 +54,21 @@ func StreamLogs(sourceIDs []string, logStreamUrl string, doer log_stream_plugin.
 	}
 }
 
-func req(sourceIDs []string) *loggregator_v2.EgressBatchRequest {
-	var s []*loggregator_v2.Selector
-	for _, sourceId := range sourceIDs {
-		s = append(s, selectors(sourceId)...)
-	}
+type applyOptionFn func(*streamLogsOptions)
 
-	if len(s) == 0 {
-		s = selectors("")
-	}
+type streamLogsOptions struct {
+	sourceIDs   []string
+	metricTypes []string
+}
 
-	return &loggregator_v2.EgressBatchRequest{
-		Selectors: s,
+func WithSourceIDs(sourceIDs []string) applyOptionFn {
+	return func(opt *streamLogsOptions) {
+		opt.sourceIDs = sourceIDs
 	}
 }
 
-func selectors(sourceId string) []*loggregator_v2.Selector {
-	return []*loggregator_v2.Selector{
-		{
-			SourceId: sourceId,
-			Message: &loggregator_v2.Selector_Log{
-				Log: &loggregator_v2.LogSelector{},
-			},
-		},
-		{
-			SourceId: sourceId,
-			Message: &loggregator_v2.Selector_Counter{
-				Counter: &loggregator_v2.CounterSelector{},
-			},
-		},
-		{
-			SourceId: sourceId,
-			Message: &loggregator_v2.Selector_Event{
-				Event: &loggregator_v2.EventSelector{},
-			},
-		},
-		{
-			SourceId: sourceId,
-			Message: &loggregator_v2.Selector_Gauge{
-				Gauge: &loggregator_v2.GaugeSelector{},
-			},
-		},
-		{
-			SourceId: sourceId,
-			Message: &loggregator_v2.Selector_Timer{
-				Timer: &loggregator_v2.TimerSelector{},
-			},
-		},
+func WithMetricTypes(metricTypes []string) applyOptionFn {
+	return func(opt *streamLogsOptions) {
+		opt.metricTypes = metricTypes
 	}
 }
