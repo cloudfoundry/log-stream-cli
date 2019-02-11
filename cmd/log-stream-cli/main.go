@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"regexp"
@@ -58,12 +59,16 @@ func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
 	return
 }
 
+// version is set via ldflags at compile time. It should be JSON encoded
+// plugin.VersionType. If it does not unmarshal, the plugin version will be
+// left empty.
+var version string
+
 func (c CFLogStreamCLI) GetMetadata() plugin.PluginMetadata {
-	v := plugin.VersionType{
-		Major: 0,
-		Minor: 0,
-		Build: 1,
-	}
+	var v plugin.VersionType
+	// Ignore the error. If this doesn't unmarshal, then we want the default
+	// VersiionType.
+	_ = json.Unmarshal([]byte(version), &v)
 
 	return plugin.PluginMetadata{
 		Name:    "log-stream",
