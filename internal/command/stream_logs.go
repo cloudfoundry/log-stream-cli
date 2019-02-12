@@ -1,6 +1,7 @@
 package command
 
 import (
+	"code.cloudfoundry.org/cli/plugin/models"
 	"code.cloudfoundry.org/go-loggregator"
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	"context"
@@ -17,7 +18,11 @@ type doer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-func StreamLogs(logStreamUrl string, client doer, writer io.Writer, options ...ApplyOptionFn) {
+type appProvider interface {
+	GetApps() ([]plugin_models.GetAppsModel, error)
+}
+
+func StreamLogs(logStreamUrl string, client doer, ap appProvider, writer io.Writer, options ...ApplyOptionFn) {
 	c := loggregator.NewRLPGatewayClient(
 		logStreamUrl,
 		loggregator.WithRLPGatewayClientLogger(log.New(NewDedupeWriter(writer), "", 0)),
@@ -29,12 +34,28 @@ func StreamLogs(logStreamUrl string, client doer, writer io.Writer, options ...A
 		apply(opts)
 	}
 
-	r, err := rlp.MakeRequest(opts.sourceIDs, opts.metricTypes, opts.shardID)
+	sourceIDs := replaceAppNamesWithGuids(opts.sourceIDs, ap)
+	r, err := rlp.MakeRequest(sourceIDs, opts.metricTypes, opts.shardID)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	streamLogs(c, r, writer)
+}
+
+func replaceAppNamesWithGuids(sids []string, ap appProvider) []string {
+	apps, err := ap.GetApps()
+	if err != nil {
+		log.Fatal("unable to retrieve apps:", err)
+	}
+	for _, a := range apps {
+		for i, s := range sids {
+			if a.Name == s {
+				sids[i] = a.Guid
+			}
+		}
+	}
+	return sids
 }
 
 func streamLogs(c *loggregator.RLPGatewayClient, r *loggregator_v2.EgressBatchRequest, writer io.Writer) {

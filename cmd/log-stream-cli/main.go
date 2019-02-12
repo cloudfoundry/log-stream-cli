@@ -50,6 +50,7 @@ func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
 		command.StreamLogs(
 			logStreamEndpoint,
 			command.NewAuthClient(accessToken, skipSSL),
+			conn,
 			os.Stdout,
 			command.WithSourceIDs(args[1:]),
 			command.WithMetricTypes(cliFlags.MetricTypes),
