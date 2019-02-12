@@ -17,6 +17,7 @@ type CFLogStreamCLI struct{}
 
 type CLIFlags struct {
 	MetricTypes []string `short:"t" long:"type"`
+	ShardID     string   `long:"shard-id"`
 }
 
 func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
@@ -53,6 +54,7 @@ func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
 			os.Stdout,
 			command.WithSourceIDs(args[1:]),
 			command.WithMetricTypes(cliFlags.MetricTypes),
+			command.WithShardID(cliFlags.ShardID),
 		)
 	}
 
@@ -81,6 +83,7 @@ func (c CFLogStreamCLI) GetMetadata() plugin.PluginMetadata {
 					Usage: "log-stream <source-id> [<source-id>] [options]",
 					Options: map[string]string{
 						"-type, -t": "Filter the streamed logs. Available: 'log','event','counter','gauge','timer'. Allows multiple.",
+						"-shard-id": "Distribute logs between multiple consumers",
 					},
 				},
 			},

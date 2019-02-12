@@ -124,6 +124,19 @@ var _ = Describe("StreamLogs", func() {
 			"{\"log\":{\"payload\":\"hello, world\"}}\n{\"log\":{\"payload\":\"goodbye, world\"}}\n"))
 	})
 
+	It("accepts a shard ID", func() {
+		ch := make(chan []byte, 100)
+		doer := &fakeDoer{
+			response: &http.Response{
+				Body:       ioutil.NopCloser(channelReader(ch)),
+				StatusCode: 200,
+			},
+		}
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer, command.WithShardID("tralala"))
+
+		Eventually(doer.Query).Should(HaveKeyWithValue("shard_id", []string{"tralala"}))
+	})
+
 	Context("when there is an error", func() {
 		It("writes the error", func() {
 			doer := &fakeDoer{

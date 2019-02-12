@@ -35,7 +35,7 @@ var metricTypeToSelector = map[string]loggregator_v2.Selector{
 	},
 }
 
-func MakeRequest(sourceIDs []string, metricTypes []string) (*loggregator_v2.EgressBatchRequest, error) {
+func MakeRequest(sourceIDs []string, metricTypes []string, shardID string) (*loggregator_v2.EgressBatchRequest, error) {
 	var invalid []string
 	for _, t := range metricTypes {
 		if _, ok := metricTypeToSelector[t]; !ok {
@@ -56,6 +56,7 @@ func MakeRequest(sourceIDs []string, metricTypes []string) (*loggregator_v2.Egre
 	}
 
 	return &loggregator_v2.EgressBatchRequest{
+		ShardId: shardID,
 		Selectors: crossProduct(
 			sourceIDs,
 			metricTypes,

@@ -24,7 +24,7 @@ func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writ
 		apply(opts)
 	}
 
-	r, err := log_stream_plugin.MakeRequest(opts.sourceIDs, opts.metricTypes)
+	r, err := log_stream_plugin.MakeRequest(opts.sourceIDs, opts.metricTypes, opts.shardID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,6 +59,7 @@ type applyOptionFn func(*streamLogsOptions)
 type streamLogsOptions struct {
 	sourceIDs   []string
 	metricTypes []string
+	shardID     string
 }
 
 func WithSourceIDs(sourceIDs []string) applyOptionFn {
@@ -70,5 +71,11 @@ func WithSourceIDs(sourceIDs []string) applyOptionFn {
 func WithMetricTypes(metricTypes []string) applyOptionFn {
 	return func(opt *streamLogsOptions) {
 		opt.metricTypes = metricTypes
+	}
+}
+
+func WithShardID(shardID string) applyOptionFn {
+	return func(opt *streamLogsOptions) {
+		opt.shardID = shardID
 	}
 }
