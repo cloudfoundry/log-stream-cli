@@ -10,7 +10,7 @@ import (
 	"github.com/cloudfoundry/log-stream-cli/internal/command"
 	"github.com/cloudfoundry/log-stream-cli/internal/log_stream_plugin"
 
-	flags "github.com/jessevdk/go-flags"
+	"github.com/jessevdk/go-flags"
 )
 
 type CFLogStreamCLI struct{}
