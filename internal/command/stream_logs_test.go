@@ -20,72 +20,62 @@ import (
 var _ = Describe("StreamLogs", func() {
 	var (
 		writer *syncedWriter
+		fc     *fakeClient
+		ch     chan []byte
 	)
 
 	BeforeEach(func() {
 		writer = &syncedWriter{
 			buf: bytes.NewBuffer([]byte{}),
 		}
+
+		ch = make(chan []byte, 1000)
+		fc = &fakeClient{
+			response: &http.Response{
+				Body:       ioutil.NopCloser(channelReader(ch)),
+				StatusCode: 200,
+			},
+		}
 	})
 
 	It("connects to the specified gateway host with the correct query params", func() {
-		ch := make(chan []byte, 100)
-		doer := &fakeDoer{
-			response: &http.Response{
-				Body:       ioutil.NopCloser(channelReader(ch)),
-				StatusCode: 200,
-			},
-		}
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, writer)
 
-		Eventually(doer.Host).Should(Equal("log-stream.test-minster.cf-app.com"))
-		Eventually(doer.Query).Should(HaveKeyWithValue("log", []string{""}))
-		Eventually(doer.Query).Should(HaveKeyWithValue("counter", []string{""}))
-		Eventually(doer.Query).Should(HaveKeyWithValue("gauge", []string{""}))
-		Eventually(doer.Query).Should(HaveKeyWithValue("timer", []string{""}))
-		Eventually(doer.Query).Should(HaveKeyWithValue("event", []string{""}))
+		Eventually(fc.Host).Should(Equal("log-stream.test-minster.cf-app.com"))
+		Eventually(fc.Query).Should(HaveKeyWithValue("log", []string{""}))
+		Eventually(fc.Query).Should(HaveKeyWithValue("counter", []string{""}))
+		Eventually(fc.Query).Should(HaveKeyWithValue("gauge", []string{""}))
+		Eventually(fc.Query).Should(HaveKeyWithValue("timer", []string{""}))
+		Eventually(fc.Query).Should(HaveKeyWithValue("event", []string{""}))
 	})
 
 	It("filters by source id", func() {
-		ch := make(chan []byte, 100)
-		doer := &fakeDoer{
-			response: &http.Response{
-				Body:       ioutil.NopCloser(channelReader(ch)),
-				StatusCode: 200,
-			},
-		}
+		go command.StreamLogs(
+			"https://log-stream.test-minster.cf-app.com",
+			fc,
+			writer,
+			command.WithSourceIDs([]string{"some-source-id", "another-source-id"}),
+		)
 
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer, command.WithSourceIDs([]string{"some-source-id", "another-source-id"}))
-
-		Eventually(doer.Query).Should(HaveKeyWithValue("source_id", []string{"some-source-id", "another-source-id"}))
+		Eventually(fc.Query).Should(HaveKeyWithValue("source_id", []string{"some-source-id", "another-source-id"}))
 	})
 
 	It("filters by metric type", func() {
-		ch := make(chan []byte, 100)
-		doer := &fakeDoer{
-			response: &http.Response{
-				Body:       ioutil.NopCloser(channelReader(ch)),
-				StatusCode: 200,
-			},
-		}
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer, command.WithMetricTypes([]string{"gauge", "timer"}))
+		go command.StreamLogs(
+			"https://log-stream.test-minster.cf-app.com",
+			fc,
+			writer,
+			command.WithMetricTypes([]string{"gauge", "timer"}),
+		)
 
-		Eventually(doer.Query).Should(HaveKeyWithValue("gauge", []string{""}))
-		Eventually(doer.Query).Should(HaveKeyWithValue("timer", []string{""}))
-		Consistently(doer.Query).ShouldNot(HaveKeyWithValue("event", []string{""}))
-		Consistently(doer.Query).ShouldNot(HaveKeyWithValue("log", []string{""}))
-		Consistently(doer.Query).ShouldNot(HaveKeyWithValue("counter", []string{""}))
+		Eventually(fc.Query).Should(HaveKeyWithValue("gauge", []string{""}))
+		Eventually(fc.Query).Should(HaveKeyWithValue("timer", []string{""}))
+		Consistently(fc.Query).ShouldNot(HaveKeyWithValue("event", []string{""}))
+		Consistently(fc.Query).ShouldNot(HaveKeyWithValue("log", []string{""}))
+		Consistently(fc.Query).ShouldNot(HaveKeyWithValue("counter", []string{""}))
 	})
 
 	It("writes received envelopes to the terminal", func() {
-		ch := make(chan []byte, 1000)
-		doer := &fakeDoer{
-			response: &http.Response{
-				Body:       ioutil.NopCloser(channelReader(ch)),
-				StatusCode: 200,
-			},
-		}
-
 		envelopeOne := &loggregator_v2.Envelope{
 			Message: &loggregator_v2.Envelope_Log{
 				Log: &loggregator_v2.Log{
@@ -102,7 +92,7 @@ var _ = Describe("StreamLogs", func() {
 			},
 		}
 
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, writer)
 
 		go func() {
 			m := jsonpb.Marshaler{}
@@ -125,35 +115,29 @@ var _ = Describe("StreamLogs", func() {
 	})
 
 	It("accepts a shard ID", func() {
-		ch := make(chan []byte, 100)
-		doer := &fakeDoer{
-			response: &http.Response{
-				Body:       ioutil.NopCloser(channelReader(ch)),
-				StatusCode: 200,
-			},
-		}
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer, command.WithShardID("tralala"))
+		go command.StreamLogs(
+			"https://log-stream.test-minster.cf-app.com",
+			fc,
+			writer,
+			command.WithShardID("tralala"),
+		)
 
-		Eventually(doer.Query).Should(HaveKeyWithValue("shard_id", []string{"tralala"}))
+		Eventually(fc.Query).Should(HaveKeyWithValue("shard_id", []string{"tralala"}))
 	})
 
 	Context("when there is an error", func() {
 		It("writes the error", func() {
-			doer := &fakeDoer{
-				response: &http.Response{
-					Body:       ioutil.NopCloser(strings.NewReader(`{"message": "there was an error"}`)),
-					StatusCode: 404,
-				},
-			}
+			fc.response.Body = ioutil.NopCloser(strings.NewReader(`{"message": "there was an error"}`))
+			fc.response.StatusCode = http.StatusNotFound
 
-			go command.StreamLogs("https://log-stream.test-minster.cf-app.com", doer, writer)
+			go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, writer)
 
 			Eventually(writer.String).Should(ContainSubstring(`{"message": "there was an error"}`))
 		})
 	})
 })
 
-type fakeDoer struct {
+type fakeClient struct {
 	response *http.Response
 	host     string
 	query    url.Values
@@ -162,21 +146,21 @@ type fakeDoer struct {
 	mu sync.Mutex
 }
 
-func (d *fakeDoer) Query() url.Values {
+func (d *fakeClient) Query() url.Values {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	return d.query
 }
 
-func (d *fakeDoer) Host() string {
+func (d *fakeClient) Host() string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	return d.host
 }
 
-func (d *fakeDoer) Do(req *http.Request) (*http.Response, error) {
+func (d *fakeClient) Do(req *http.Request) (*http.Response, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
