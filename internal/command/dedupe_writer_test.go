@@ -1,7 +1,7 @@
-package log_stream_plugin_test
+package command_test
 
 import (
-	"github.com/cloudfoundry/log-stream-cli/internal/log_stream_plugin"
+	"github.com/cloudfoundry/log-stream-cli/internal/command"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -9,12 +9,12 @@ import (
 var _ = Describe("DedupeWriter", func() {
 	var (
 		fw     *fakeWriter
-		writer *log_stream_plugin.DedupeWriter
+		writer *command.DedupeWriter
 	)
 
 	BeforeEach(func() {
 		fw = &fakeWriter{}
-		writer = log_stream_plugin.NewDedupeWriter(fw)
+		writer = command.NewDedupeWriter(fw)
 	})
 
 	It("writes the message", func() {

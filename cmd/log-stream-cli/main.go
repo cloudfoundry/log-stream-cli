@@ -8,7 +8,6 @@ import (
 
 	"code.cloudfoundry.org/cli/plugin"
 	"github.com/cloudfoundry/log-stream-cli/internal/command"
-	"github.com/cloudfoundry/log-stream-cli/internal/log_stream_plugin"
 
 	"github.com/jessevdk/go-flags"
 )
@@ -50,7 +49,7 @@ func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
 	case "log-stream":
 		command.StreamLogs(
 			logStreamEndpoint,
-			log_stream_plugin.NewDoer(accessToken, skipSSL),
+			command.NewDoer(accessToken, skipSSL),
 			os.Stdout,
 			command.WithSourceIDs(args[1:]),
 			command.WithMetricTypes(cliFlags.MetricTypes),

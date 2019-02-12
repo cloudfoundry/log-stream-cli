@@ -1,21 +1,23 @@
 package command
 
 import (
+	"code.cloudfoundry.org/go-loggregator"
+	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	"context"
 	"encoding/json"
+	"github.com/cloudfoundry/log-stream-cli/internal/presentation"
+	"github.com/cloudfoundry/log-stream-cli/internal/rlp"
+	"github.com/gogo/protobuf/jsonpb"
 	"io"
 	"log"
-
-	loggregator "code.cloudfoundry.org/go-loggregator"
-	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
-	"github.com/cloudfoundry/log-stream-cli/internal/log_stream_plugin"
-	"github.com/gogo/protobuf/jsonpb"
 )
 
-func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writer, options ...applyOptionFn) {
+
+
+func StreamLogs(logStreamUrl string, doer Doer, writer io.Writer, options ...ApplyOptionFn) {
 	c := loggregator.NewRLPGatewayClient(
 		logStreamUrl,
-		loggregator.WithRLPGatewayClientLogger(log.New(log_stream_plugin.NewDedupeWriter(writer), "", 0)),
+		loggregator.WithRLPGatewayClientLogger(log.New(NewDedupeWriter(writer), "", 0)),
 		loggregator.WithRLPGatewayHTTPClient(doer),
 	)
 
@@ -24,18 +26,22 @@ func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writ
 		apply(opts)
 	}
 
-	r, err := log_stream_plugin.MakeRequest(opts.sourceIDs, opts.metricTypes, opts.shardID)
+	r, err := rlp.MakeRequest(opts.sourceIDs, opts.metricTypes, opts.shardID)
 	if err != nil {
 		log.Fatal(err)
 	}
-	es := c.Stream(context.Background(), r)
 
+	streamLogs(c, r, writer)
+}
+
+func streamLogs(c *loggregator.RLPGatewayClient, r *loggregator_v2.EgressBatchRequest, writer io.Writer) {
+	es := c.Stream(context.Background(), r)
 	marshaler := jsonpb.Marshaler{}
 	for {
 		for _, e := range es() {
 			switch e.Message.(type) {
 			case *loggregator_v2.Envelope_Log:
-				bytes, err := json.Marshal(log_stream_plugin.BuildBase64DecodedLog(e))
+				bytes, err := json.Marshal(presentation.BuildBase64DecodedLog(e))
 				if err != nil {
 					log.Fatal("error marshalling", err)
 				}
@@ -54,7 +60,7 @@ func StreamLogs(logStreamUrl string, doer log_stream_plugin.Doer, writer io.Writ
 	}
 }
 
-type applyOptionFn func(*streamLogsOptions)
+type ApplyOptionFn func(*streamLogsOptions)
 
 type streamLogsOptions struct {
 	sourceIDs   []string
@@ -62,19 +68,19 @@ type streamLogsOptions struct {
 	shardID     string
 }
 
-func WithSourceIDs(sourceIDs []string) applyOptionFn {
+func WithSourceIDs(sourceIDs []string) ApplyOptionFn {
 	return func(opt *streamLogsOptions) {
 		opt.sourceIDs = sourceIDs
 	}
 }
 
-func WithMetricTypes(metricTypes []string) applyOptionFn {
+func WithMetricTypes(metricTypes []string) ApplyOptionFn {
 	return func(opt *streamLogsOptions) {
 		opt.metricTypes = metricTypes
 	}
 }
 
-func WithShardID(shardID string) applyOptionFn {
+func WithShardID(shardID string) ApplyOptionFn {
 	return func(opt *streamLogsOptions) {
 		opt.shardID = shardID
 	}

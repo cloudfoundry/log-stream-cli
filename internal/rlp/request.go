@@ -1,4 +1,4 @@
-package command
+package rlp
 
 import (
 	"fmt"

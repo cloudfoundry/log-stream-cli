@@ -1,11 +1,13 @@
-package log_stream_plugin
+package command
 
 import (
 	"crypto/tls"
 	"net/http"
 )
 
-
+type Doer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
 type AuthDoer struct {
 	token  string

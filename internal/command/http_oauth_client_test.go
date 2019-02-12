@@ -1,9 +1,8 @@
-package log_stream_plugin_test
+package command_test
 
 import (
+	"github.com/cloudfoundry/log-stream-cli/internal/command"
 	"net/http"
-
-	"github.com/cloudfoundry/log-stream-cli/internal/log_stream_plugin"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -11,14 +10,14 @@ import (
 
 var _ = Describe("DoerProvider", func() {
 	It("correctly sets insecureSkipVerify", func() {
-		auth := log_stream_plugin.NewDoer("foo", true).(*log_stream_plugin.AuthDoer)
+		auth := command.NewDoer("foo", true).(*command.AuthDoer)
 
 		client := auth.Client.(*http.Client)
 		Expect(client.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify).To(BeTrue())
 	})
 
 	It("correctly sets the auth token", func() {
-		auth := log_stream_plugin.NewDoer("foo", true).(*log_stream_plugin.AuthDoer)
+		auth := command.NewDoer("foo", true).(*command.AuthDoer)
 
 		req := &http.Request{
 			Header: make(http.Header),

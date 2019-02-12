@@ -1,4 +1,4 @@
-package log_stream_plugin
+package presentation
 
 import "code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 
