@@ -1,4 +1,4 @@
-package log_stream_plugin
+package command
 
 import (
 	"fmt"

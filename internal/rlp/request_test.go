@@ -1,9 +1,8 @@
-package log_stream_plugin_test
+package command_test
 
 import (
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
-	"github.com/cloudfoundry/log-stream-cli/internal/log_stream_plugin"
-
+	"github.com/cloudfoundry/log-stream-cli/internal/command"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -26,7 +25,7 @@ var _ = Describe("RLPRequestFactory", func() {
 				},
 			},
 		}
-		actual, err := log_stream_plugin.MakeRequest([]string{"foo"}, []string{"gauge", "counter"}, "")
+		actual, err := command.MakeRequest([]string{"foo"}, []string{"gauge", "counter"}, "")
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(actual).To(Equal(expected))
@@ -47,7 +46,7 @@ var _ = Describe("RLPRequestFactory", func() {
 				},
 			},
 		}
-		actual, err := log_stream_plugin.MakeRequest([]string{}, []string{"event", "log"}, "")
+		actual, err := command.MakeRequest([]string{}, []string{"event", "log"}, "")
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(actual).To(Equal(expected))
@@ -88,21 +87,21 @@ var _ = Describe("RLPRequestFactory", func() {
 				},
 			},
 		}
-		actual, err := log_stream_plugin.MakeRequest([]string{"foo"}, []string{}, "")
+		actual, err := command.MakeRequest([]string{"foo"}, []string{}, "")
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(actual).To(Equal(expected))
 	})
 
 	It("makes one selector with specified shardID", func() {
-		actual, err := log_stream_plugin.MakeRequest([]string{}, []string{"event", "log"}, "tralala")
+		actual, err := command.MakeRequest([]string{}, []string{"event", "log"}, "tralala")
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(actual.ShardId).To(Equal("tralala"))
 	})
 
 	It("returns an error when given invalid metric types", func() {
-		_, err := log_stream_plugin.MakeRequest([]string{"source-one", "source-two"}, []string{"gauge", "foo", "bar"}, "")
+		_, err := command.MakeRequest([]string{"source-one", "source-two"}, []string{"gauge", "foo", "bar"}, "")
 
 		Expect(err.Error()).To(Equal("invalid metric type(s): foo, bar"))
 	})
