@@ -5,21 +5,17 @@ import (
 	"net/http"
 )
 
-type Doer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-type AuthDoer struct {
+type AuthClient struct {
 	token  string
-	Client Doer
+	Client *http.Client
 }
 
-func (d *AuthDoer) Do(req *http.Request) (*http.Response, error) {
+func (d *AuthClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Authorization", d.token)
 	return d.Client.Do(req)
 }
 
-func NewDoer(accessToken string, insecureSkipVerify bool) Doer {
+func NewAuthClient(accessToken string, insecureSkipVerify bool) *AuthClient {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -28,7 +24,7 @@ func NewDoer(accessToken string, insecureSkipVerify bool) Doer {
 		},
 	}
 
-	return &AuthDoer{
+	return &AuthClient{
 		token:  accessToken,
 		Client: client,
 	}

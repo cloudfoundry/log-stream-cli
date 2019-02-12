@@ -10,15 +10,18 @@ import (
 	"github.com/gogo/protobuf/jsonpb"
 	"io"
 	"log"
+	"net/http"
 )
 
+type doer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
-
-func StreamLogs(logStreamUrl string, doer Doer, writer io.Writer, options ...ApplyOptionFn) {
+func StreamLogs(logStreamUrl string, client doer, writer io.Writer, options ...ApplyOptionFn) {
 	c := loggregator.NewRLPGatewayClient(
 		logStreamUrl,
 		loggregator.WithRLPGatewayClientLogger(log.New(NewDedupeWriter(writer), "", 0)),
-		loggregator.WithRLPGatewayHTTPClient(doer),
+		loggregator.WithRLPGatewayHTTPClient(client),
 	)
 
 	opts := &streamLogsOptions{}

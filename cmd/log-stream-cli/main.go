@@ -49,7 +49,7 @@ func (c CFLogStreamCLI) Run(conn plugin.CliConnection, args []string) {
 	case "log-stream":
 		command.StreamLogs(
 			logStreamEndpoint,
-			command.NewDoer(accessToken, skipSSL),
+			command.NewAuthClient(accessToken, skipSSL),
 			os.Stdout,
 			command.WithSourceIDs(args[1:]),
 			command.WithMetricTypes(cliFlags.MetricTypes),

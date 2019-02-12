@@ -10,14 +10,14 @@ import (
 
 var _ = Describe("DoerProvider", func() {
 	It("correctly sets insecureSkipVerify", func() {
-		auth := command.NewDoer("foo", true).(*command.AuthDoer)
+		auth := command.NewAuthClient("foo", true)
 
-		client := auth.Client.(*http.Client)
+		client := auth.Client
 		Expect(client.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify).To(BeTrue())
 	})
 
 	It("correctly sets the auth token", func() {
-		auth := command.NewDoer("foo", true).(*command.AuthDoer)
+		auth := command.NewAuthClient("foo", true)
 
 		req := &http.Request{
 			Header: make(http.Header),
