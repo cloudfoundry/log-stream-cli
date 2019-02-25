@@ -49,6 +49,8 @@ OPTIONS:
 
 ```
 
+The `source-id` can either be the application name, the application guid or the name of the component (e.g. `doppler`, `uaa`, `gorouter`...). You can provide as many source-ids as you want. If you are a platform admin (you have the the `logs.admin` scope from UAA), then you can also omit the source-id and you see all messages available in the RLP.
+
 [cf-cli]: https://code.cloudfoundry.org/cli
 [ci-badge]: https://loggregator.ci.cf-app.com/api/v1/pipelines/products/jobs/log-stream-cli-tests/badge
 [ci-tests]: https://loggregator.ci.cf-app.com/teams/main/pipelines/products/jobs/log-stream-cli-tests
