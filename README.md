@@ -44,7 +44,9 @@ USAGE:
    log-stream <source-id> [<source-id>] [options]
 
 OPTIONS:
+   --shard-id       Distribute logs between multiple consumers
    --type, -t       Filter the streamed logs. Available: 'log','event','counter','gauge','timer'. Allows multiple.
+
 ```
 
 [cf-cli]: https://code.cloudfoundry.org/cli
