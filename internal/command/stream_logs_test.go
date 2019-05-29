@@ -3,6 +3,7 @@ package command_test
 import (
 	"bytes"
 	"code.cloudfoundry.org/cli/plugin/models"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,10 +21,10 @@ import (
 
 var _ = Describe("StreamLogs", func() {
 	var (
-		writer *syncedWriter
-		fc     *fakeClient
-		fa     *fakeAppProvider
-		ch     chan []byte
+		writer     *syncedWriter
+		fc         *fakeClient
+		appPovider *fakeAppProvider
+		ch         chan []byte
 	)
 
 	BeforeEach(func() {
@@ -39,11 +40,11 @@ var _ = Describe("StreamLogs", func() {
 			},
 		}
 
-		fa = &fakeAppProvider{}
+		appPovider = &fakeAppProvider{}
 	})
 
 	It("connects to the specified gateway host with the correct query params", func() {
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, fa, writer)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, appPovider, writer)
 
 		Eventually(fc.Host).Should(Equal("log-stream.test-minster.cf-app.com"))
 		Eventually(fc.Query).Should(HaveKeyWithValue("log", []string{""}))
@@ -57,7 +58,7 @@ var _ = Describe("StreamLogs", func() {
 		go command.StreamLogs(
 			"https://log-stream.test-minster.cf-app.com",
 			fc,
-			fa,
+			appPovider,
 			writer,
 			command.WithSourceIDs([]string{"some-source-id", "another-source-id"}),
 		)
@@ -69,7 +70,7 @@ var _ = Describe("StreamLogs", func() {
 		go command.StreamLogs(
 			"https://log-stream.test-minster.cf-app.com",
 			fc,
-			fa,
+			appPovider,
 			writer,
 			command.WithMetricTypes([]string{"gauge", "timer"}),
 		)
@@ -98,7 +99,7 @@ var _ = Describe("StreamLogs", func() {
 			},
 		}
 
-		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, fa, writer)
+		go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, appPovider, writer)
 
 		go func() {
 			m := jsonpb.Marshaler{}
@@ -124,7 +125,7 @@ var _ = Describe("StreamLogs", func() {
 		go command.StreamLogs(
 			"https://log-stream.test-minster.cf-app.com",
 			fc,
-			fa,
+			appPovider,
 			writer,
 			command.WithShardID("tralala"),
 		)
@@ -133,13 +134,13 @@ var _ = Describe("StreamLogs", func() {
 	})
 
 	It("requests app id when app name is given", func() {
-		fa.apps = []plugin_models.GetAppsModel{
+		appPovider.apps = []plugin_models.GetAppsModel{
 			{Name: "app-name", Guid: "app-guid"},
 		}
 		go command.StreamLogs(
 			"https://log-stream.test-minster.cf-app.com",
 			fc,
-			fa,
+			appPovider,
 			writer,
 			command.WithSourceIDs([]string{"app-name", "another-app-guid"}),
 		)
@@ -147,12 +148,26 @@ var _ = Describe("StreamLogs", func() {
 		Eventually(fc.Query).Should(HaveKeyWithValue("source_id", []string{"app-guid", "another-app-guid"}))
 	})
 
+	It("requests source ids if unable to retrieve apps", func() {
+		appPovider.err = errors.New("some error")
+
+		go command.StreamLogs(
+			"https://log-stream.test-minster.cf-app.com",
+			fc,
+			appPovider,
+			writer,
+			command.WithSourceIDs([]string{"app-name", "another-app-guid"}),
+		)
+
+		Eventually(fc.Query).Should(HaveKeyWithValue("source_id", []string{"app-name", "another-app-guid"}))
+	})
+
 	Context("when there is an error", func() {
 		It("writes the error", func() {
 			fc.response.Body = ioutil.NopCloser(strings.NewReader(`{"message": "there was an error"}`))
 			fc.response.StatusCode = http.StatusNotFound
 
-			go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, fa, writer)
+			go command.StreamLogs("https://log-stream.test-minster.cf-app.com", fc, appPovider, writer)
 
 			Eventually(writer.String).Should(ContainSubstring(`{"message": "there was an error"}`))
 		})
@@ -161,10 +176,11 @@ var _ = Describe("StreamLogs", func() {
 
 type fakeAppProvider struct {
 	apps []plugin_models.GetAppsModel
+	err  error
 }
 
 func (a *fakeAppProvider) GetApps() ([]plugin_models.GetAppsModel, error) {
-	return a.apps, nil
+	return a.apps, a.err
 }
 
 type fakeClient struct {

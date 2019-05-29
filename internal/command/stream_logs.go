@@ -46,7 +46,8 @@ func StreamLogs(logStreamUrl string, client doer, ap appProvider, writer io.Writ
 func replaceAppNamesWithGuids(sids []string, ap appProvider) []string {
 	apps, err := ap.GetApps()
 	if err != nil {
-		log.Fatal("unable to retrieve apps:", err)
+		log.Printf("Warning, unable to retrieve apps: %s. Using raw input", err)
+		return sids
 	}
 	for _, a := range apps {
 		for i, s := range sids {
