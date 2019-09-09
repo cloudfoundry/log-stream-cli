@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"github.com/cloudfoundry/log-stream-cli/internal/presentation"
 	"github.com/cloudfoundry/log-stream-cli/internal/rlp"
-	"github.com/gogo/protobuf/jsonpb"
 	"io"
 	"log"
 	"net/http"
@@ -61,25 +60,18 @@ func replaceAppNamesWithGuids(sids []string, ap appProvider) []string {
 
 func streamLogs(c *loggregator.RLPGatewayClient, r *loggregator_v2.EgressBatchRequest, writer io.Writer) {
 	es := c.Stream(context.Background(), r)
-	marshaler := jsonpb.Marshaler{}
 	for {
 		for _, e := range es() {
-			switch e.Message.(type) {
-			case *loggregator_v2.Envelope_Log:
-				bytes, err := json.Marshal(presentation.BuildBase64DecodedLog(e))
-				if err != nil {
-					log.Fatal("error marshalling", err)
-				}
-
-				_, err = writer.Write(bytes)
-				if err != nil {
-					log.Fatal(err)
-				}
-			default:
-				if err := marshaler.Marshal(writer, e); err != nil {
-					log.Fatal(err)
-				}
+			presEnv, err := presentation.Envelope(e)
+			if err != nil {
+				log.Fatal(err)
 			}
+
+			envString, err := json.Marshal(presEnv); if err != nil {
+				log.Fatal(err)
+			}
+
+			writer.Write(envString)
 			writer.Write([]byte("\n"))
 		}
 	}
